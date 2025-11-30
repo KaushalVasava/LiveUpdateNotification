@@ -12,7 +12,9 @@ import androidx.annotation.RequiresApi
 import androidx.annotation.RequiresPermission
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.kaushal.app.livenotoficationupdate.MainActivity
+import androidx.core.graphics.toColorInt
 
 /**
  * Manager class to handle Live Update notifications
@@ -25,6 +27,8 @@ class LiveUpdateNotificationManager(private val context: Context) {
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     companion object {
+        private const val TAG = "LiveUpdateNotifMgr"
+        
         const val CHANNEL_ID = "live_updates_channel"
         const val CHANNEL_NAME = "Live Updates"
 
@@ -110,48 +114,71 @@ class LiveUpdateNotificationManager(private val context: Context) {
         )
 
         // Create ProgressStyle with colored segments and milestone points
-        val pointColor = android.graphics.Color.parseColor("#ECB7FF") // Light purple
-        val segmentColor = android.graphics.Color.parseColor("#86F7FA") // Light cyan
+        val pointColor = "#ECB7FF".toColorInt() // Light purple
+        val segmentColor = "#86F7FA".toColorInt() // Light cyan
         
-        val progressStyle = Notification.ProgressStyle()
+        val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressSegments(
                 listOf(
-                    Notification.ProgressStyle.Segment(25).setColor(segmentColor),
-                    Notification.ProgressStyle.Segment(25).setColor(segmentColor),
-                    Notification.ProgressStyle.Segment(25).setColor(segmentColor),
-                    Notification.ProgressStyle.Segment(25).setColor(segmentColor)
+                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
+                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
+                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
+                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor)
                 )
             )
 
         // Add progress points based on current progress (milestones)
-        val points = mutableListOf<Notification.ProgressStyle.Point>()
-        if (progressValue >= 25) points.add(Notification.ProgressStyle.Point(25).setColor(pointColor))
-        if (progressValue >= 50) points.add(Notification.ProgressStyle.Point(50).setColor(pointColor))
-        if (progressValue >= 75) points.add(Notification.ProgressStyle.Point(75).setColor(pointColor))
+        val points = mutableListOf<NotificationCompat.ProgressStyle.Point>()
+        if (progressValue >= 25) points.add(NotificationCompat.ProgressStyle.Point(25).setColor(pointColor))
+        if (progressValue >= 50) points.add(NotificationCompat.ProgressStyle.Point(50).setColor(pointColor))
+        if (progressValue >= 75) points.add(NotificationCompat.ProgressStyle.Point(75).setColor(pointColor))
         if (points.isNotEmpty()) {
             progressStyle.setProgressPoints(points)
         }
 
-        progressStyle.setProgress(progressValue)
+        // Handle indeterminate progress for initial state
+        if (progressValue == 0) {
+            progressStyle.setProgressIndeterminate(true)
+        } else {
+            progressStyle.setProgress(progressValue)
+        }
 
-        val notification = Notification.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_sort_by_size)
+        // Use IconCompat for better compatibility
+        val smallIcon = IconCompat.createWithResource(context, android.R.drawable.ic_menu_sort_by_size)
+
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(smallIcon)
             .setContentTitle("🍕 Food Delivery Order")
             .setContentText(orderStatus)
             .setContentIntent(mainPendingIntent)
             .setStyle(progressStyle)
-            // Live Update requirements
+            .setRequestPromotedOngoing(true)
+            // CRITICAL: Request promotion to Live Update
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            // Status chip: Shows critical info at a glance
-            // Appears in status bar when notification is collapsed
+            // Status chip: Shows critical info at a glance in status bar
+            // FIXED: Use dynamic statusText instead of hardcoded "Food"
             .setShortCriticalText(statusText)
-            .setExtras(android.os.Bundle().apply {
-                putBoolean("android.requestPromotedOngoing", true)
-            })
-            .build()
+
+        // Add conditional actions based on delivery progress (like AOSP example)
+        when {
+            progressValue >= 90 && progressValue < 100 -> {
+                // Food arriving - add acknowledgment actions
+                builder.addAction(
+                    NotificationCompat.Action.Builder(null, "Got it", null).build()
+                )
+            }
+            progressValue >= 100 -> {
+                // Order complete - add rating action
+                builder.addAction(
+                    NotificationCompat.Action.Builder(null, "Rate delivery", null).build()
+                )
+            }
+        }
+
+        val notification = builder.build()
         
-        // Request promotion to Live Update
+        // Mark as ongoing event for promotion to Live Update
         notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT
         return notification
     }
@@ -180,27 +207,47 @@ class LiveUpdateNotificationManager(private val context: Context) {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        // Use IconCompat for better compatibility
+        val smallIcon = IconCompat.createWithResource(context, android.R.drawable.ic_menu_sort_by_size)
+        val cancelIcon = IconCompat.createWithResource(context, android.R.drawable.ic_menu_close_clear_cancel)
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_menu_sort_by_size)
+            .setSmallIcon(smallIcon)
             .setContentTitle("🍕 Food Delivery Order")
             .setContentText(orderStatus)
             .setSubText(statusText)
             .setContentIntent(mainPendingIntent)
-            .setProgress(100, progress, false)
+            .setProgress(100, progress, progress == 0)  // Indeterminate if progress is 0
             // Live Update requirements
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .addAction(
-                android.R.drawable.ic_menu_close_clear_cancel,
-                "Cancel Order",
-                cancelPendingIntent
-            )
 
-        // Add status chip for Android 14+
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            builder.setShortcutId(statusText)
+        // Add conditional actions based on delivery progress
+        when {
+            progress < 90 -> {
+                // Show cancel option before delivery arrives
+                builder.addAction(
+                    NotificationCompat.Action.Builder(
+                        cancelIcon,
+                        "Cancel Order",
+                        cancelPendingIntent
+                    ).build()
+                )
+            }
+            progress >= 90 && progress < 100 -> {
+                // Food arriving - add acknowledgment action
+                builder.addAction(
+                    NotificationCompat.Action.Builder(null, "Got it", null).build()
+                )
+            }
+            progress >= 100 -> {
+                // Order complete - add rating action
+                builder.addAction(
+                    NotificationCompat.Action.Builder(null, "Rate delivery", null).build()
+                )
+            }
         }
 
         val notification = builder.build()
@@ -209,7 +256,7 @@ class LiveUpdateNotificationManager(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT
         }
-        
+
         return notification
     }
 }

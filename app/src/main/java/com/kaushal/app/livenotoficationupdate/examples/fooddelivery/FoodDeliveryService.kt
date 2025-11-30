@@ -68,12 +68,19 @@ class FoodDeliveryService : Service() {
         }
 
         // Check if Live Updates are enabled (for debugging status chips)
-        notificationManager.canPostPromotedNotifications()
+        val canPostPromoted = notificationManager.canPostPromotedNotifications()
+        Log.d(TAG, "Can post promoted notifications: $canPostPromoted")
         
         isRunning = true
 
         // Get initial notification from handler
         val notification = deliveryHandler.start()
+
+        // Check if notification has promotable characteristics (Android 16+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            val hasPromotable = notification.hasPromotableCharacteristics()
+            Log.d(TAG, "Initial notification hasPromotableCharacteristics: $hasPromotable")
+        }
 
         // Start as foreground service (REQUIRED for continuous tracking)
         startForeground(
