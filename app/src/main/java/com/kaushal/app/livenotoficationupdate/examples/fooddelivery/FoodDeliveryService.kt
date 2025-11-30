@@ -5,7 +5,6 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
-import com.kaushal.app.livenotoficationupdate.LiveUpdateNotificationManager
 
 /**
  * Dedicated foreground service for food delivery tracking
@@ -27,7 +26,6 @@ class FoodDeliveryService : Service() {
 
     companion object {
         private const val TAG = "FoodDeliveryService"
-        
         // Action to start food delivery tracking
         const val ACTION_START = "com.kaushal.app.livenotoficationupdate.fooddelivery.START"
         const val ACTION_STOP = "com.kaushal.app.livenotoficationupdate.fooddelivery.STOP"
@@ -35,8 +33,7 @@ class FoodDeliveryService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        Log.d(TAG, "FoodDeliveryService created")
-        
+
         // Initialize notification manager
         notificationManager = LiveUpdateNotificationManager(this)
         
@@ -45,7 +42,6 @@ class FoodDeliveryService : Service() {
             service = this,
             notificationManager = notificationManager,
             onComplete = {
-                Log.d(TAG, "Delivery completed - stopping service")
                 stopDelivery()
             }
         )
@@ -68,14 +64,11 @@ class FoodDeliveryService : Service() {
      */
     private fun startDelivery() {
         if (isRunning) {
-            Log.w(TAG, "Delivery tracking already running")
             return
         }
 
-        Log.d(TAG, "Starting food delivery tracking")
-        
         // Check if Live Updates are enabled (for debugging status chips)
-        FoodDeliveryNotificationHelper.canPostPromotedNotifications(this)
+        notificationManager.canPostPromotedNotifications()
         
         isRunning = true
 
@@ -88,7 +81,6 @@ class FoodDeliveryService : Service() {
             notification
         )
 
-        Log.d(TAG, "Food delivery tracking started as foreground service")
     }
 
     /**
@@ -96,11 +88,9 @@ class FoodDeliveryService : Service() {
      */
     private fun stopDelivery() {
         if (!isRunning) {
-            Log.w(TAG, "Delivery tracking not running")
             return
         }
 
-        Log.d(TAG, "Stopping food delivery tracking")
         isRunning = false
 
         // Stop the handler
@@ -117,15 +107,13 @@ class FoodDeliveryService : Service() {
         // Stop the service
         stopSelf()
 
-        Log.d(TAG, "Food delivery service stopped")
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
         super.onDestroy()
-        Log.d(TAG, "FoodDeliveryService destroyed")
-        
+
         // Ensure handler is stopped
         if (isRunning) {
             deliveryHandler.stop()

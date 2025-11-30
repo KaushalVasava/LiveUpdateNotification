@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.kaushal.app.livenotoficationupdate.examples.fooddelivery.FoodDeliveryService
+import com.kaushal.app.livenotoficationupdate.examples.fooddelivery.LiveUpdateNotificationManager
 import com.kaushal.app.livenotoficationupdate.ui.theme.LiveNotoficationUpdateTheme
 
 class MainActivity : ComponentActivity() {
@@ -58,11 +59,7 @@ class MainActivity : ComponentActivity() {
                     LiveUpdateDemoScreen(
                         hasPermission = hasNotificationPermission,
                         onRequestPermission = { requestNotificationPermission() },
-                        onStartTimer = { startLiveUpdate(LiveUpdateService.ACTION_START_TIMER) },
-                        onStartProgress = { startLiveUpdate(LiveUpdateService.ACTION_START_PROGRESS) },
-                        onStartNavigation = { startLiveUpdate(LiveUpdateService.ACTION_START_NAVIGATION) },
-                        onStartWorkout = { startLiveUpdate(LiveUpdateService.ACTION_START_WORKOUT) },
-                        onStartFoodDelivery = { startFoodDelivery() },  // Use dedicated service
+                        onStartFoodDelivery = { startFoodDelivery() },
                         onOpenSettings = { openNotificationSettings() },
                         canPostPromoted = notificationManager.canPostPromotedNotifications()
                     )
@@ -86,33 +83,6 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-    }
-
-    private fun startLiveUpdate(action: String) {
-        if (!hasNotificationPermission) {
-            Toast.makeText(this, "Please grant notification permission first", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val intent = Intent(this, LiveUpdateService::class.java).apply {
-            this.action = action
-        }
-        
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-
-        val updateType = when (action) {
-            LiveUpdateService.ACTION_START_TIMER -> "Timer"
-            LiveUpdateService.ACTION_START_PROGRESS -> "Progress"
-            LiveUpdateService.ACTION_START_NAVIGATION -> "Navigation"
-            LiveUpdateService.ACTION_START_WORKOUT -> "Workout"
-            else -> "Live Update"
-        }
-        
-        Toast.makeText(this, "$updateType started", Toast.LENGTH_SHORT).show()
     }
 
     private fun startFoodDelivery() {
@@ -154,10 +124,6 @@ class MainActivity : ComponentActivity() {
 fun LiveUpdateDemoScreen(
     hasPermission: Boolean,
     onRequestPermission: () -> Unit,
-    onStartTimer: () -> Unit,
-    onStartProgress: () -> Unit,
-    onStartNavigation: () -> Unit,
-    onStartWorkout: () -> Unit,
     onStartFoodDelivery: () -> Unit,
     onOpenSettings: () -> Unit,
     canPostPromoted: Boolean
@@ -226,47 +192,6 @@ fun LiveUpdateDemoScreen(
                 color = MaterialTheme.colorScheme.primaryContainer,
                 isNew = true
             )
-
-            // Timer Example
-            LiveUpdateCard(
-                title = "Timer / Stopwatch",
-                description = "Perfect for workout timers, cooking, or any time-tracking activity",
-                icon = Icons.Default.Star,
-                onClick = onStartTimer,
-                enabled = hasPermission,
-                color = MaterialTheme.colorScheme.secondaryContainer
-            )
-
-            // Progress Example
-            LiveUpdateCard(
-                title = "Progress Tracker",
-                description = "Track downloads, file transfers, or delivery progress",
-                icon = Icons.Default.Refresh,
-                onClick = onStartProgress,
-                enabled = hasPermission,
-                color = MaterialTheme.colorScheme.tertiaryContainer
-            )
-
-            // Navigation Example
-            LiveUpdateCard(
-                title = "Navigation",
-                description = "Turn-by-turn directions with ETA updates",
-                icon = Icons.Default.Place,
-                onClick = onStartNavigation,
-                enabled = hasPermission,
-                color = MaterialTheme.colorScheme.errorContainer
-            )
-
-            // Workout Example
-            LiveUpdateCard(
-                title = "Workout Tracking",
-                description = "Monitor exercise duration, distance, and pace",
-                icon = Icons.Default.FavoriteBorder,
-                onClick = onStartWorkout,
-                enabled = hasPermission,
-                color = MaterialTheme.colorScheme.surfaceVariant
-            )
-
             Spacer(modifier = Modifier.height(8.dp))
 
             // Info Section
@@ -368,10 +293,10 @@ fun PermissionStatusCard(
                         contentDescription = null,
                         modifier = Modifier.size(20.dp)
                     )
-    Text(
-                        text = if (canPostPromoted) 
-                            "Live Updates enabled in settings" 
-                        else 
+                    Text(
+                        text = if (canPostPromoted)
+                            "Live Updates enabled in settings"
+                        else
                             "Enable Live Updates in settings for best experience",
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -389,7 +314,6 @@ fun PermissionStatusCard(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LiveUpdateCard(
     title: String,

@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.kaushal.app.livenotoficationupdate.LiveUpdateNotificationManager
 
 /**
  * Service handler for food delivery tracking
@@ -79,20 +78,17 @@ class FoodDeliveryServiceHandler(
 
     /**
      * Create notification for given order state
+     * Now uses LiveUpdateNotificationManager (combined from helper)
      */
     private fun createNotification(state: OrderState): Notification {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            FoodDeliveryNotificationHelper.createProgressStyleNotification(
-                service,
-                LiveUpdateNotificationManager.CHANNEL_ID,
+            notificationManager.createFoodDeliveryNotification(
                 state.orderStatus,
                 state.statusText,
                 state.progress
             )
         } else {
-            FoodDeliveryNotificationHelper.createCompatNotification(
-                service,
-                LiveUpdateNotificationManager.CHANNEL_ID,
+            notificationManager.createFoodDeliveryNotificationCompat(
                 state.orderStatus,
                 state.statusText,
                 state.progress
